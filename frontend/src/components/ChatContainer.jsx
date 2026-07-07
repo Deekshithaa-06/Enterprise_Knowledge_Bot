@@ -90,12 +90,13 @@ const supportedFormats = [
   { ext: 'TXT',  icon: FileText,        color: '#8E8EA0' },
 ];
 
-const ChatContainer = forwardRef(function ChatContainer({ documentCount }, ref) {
+const ChatContainer = forwardRef(function ChatContainer({ documentCount, user, onConversationUpdated }, ref) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeCitation, setActiveCitation] = useState(null);
   const [copiedMessageIndex, setCopiedMessageIndex] = useState(null);
+  const [currentConvId, setCurrentConvId] = useState(null);
   const bottomRef = useRef(null);
   const copyResetRef = useRef(null);
 
@@ -111,10 +112,37 @@ const ChatContainer = forwardRef(function ChatContainer({ documentCount }, ref) 
     setInput('');
     setActiveCitation(null);
     setCopiedMessageIndex(null);
+    setCurrentConvId(null);
+  };
+
+  const loadConversation = async (convId) => {
+    if (loading) return;
+    handleNewChat();
+    setCurrentConvId(convId);
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('kb_token');
+      const res = await fetch(`/api/conversations/${convId}/messages`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data.map(m => ({
+          role: m.role,
+          text: m.text,
+          citations: m.citations
+        })));
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useImperativeHandle(ref, () => ({
     newChat: handleNewChat,
+    loadConversation: loadConversation
   }), [loading]);
 
   const copyBotResponse = async (text, index) => {
@@ -159,11 +187,25 @@ const ChatContainer = forwardRef(function ChatContainer({ documentCount }, ref) 
     setMessages(prev => [...prev, { role: 'user', text: q }]);
     setLoading(true);
     try {
+      const token = localStorage.getItem('kb_token');
+      const payload = { query: q, top_k: 40 };
+      if (currentConvId) payload.conversation_id = currentConvId;
+
       const res = await fetch('/api/query', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, top_k: 40 }),
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
+      
+      if (res.ok && data.conversation_id) {
+        const isNew = !currentConvId;
+        setCurrentConvId(data.conversation_id);
+        if (isNew && onConversationUpdated) {
+          onConversationUpdated();
+        }
+      }
+
       setMessages(prev => [...prev, res.ok
         ? { role:'bot', text: data.answer, citations: data.citations||[], chart: data.chart||null }
         : { role:'bot', text: `### Error\n\n${data.detail||'Server error.'}`, citations:[], chart:null }
@@ -183,7 +225,8 @@ const ChatContainer = forwardRef(function ChatContainer({ documentCount }, ref) 
       // For PDFs, open in new tab and jump to the exact page
       const pageMatch = citation.page_or_section?.match(/\d+/);
       const pageNumber = pageMatch ? pageMatch[0] : 1;
-      window.open(`/api/documents/${citation.doc_id}/open#page=${pageNumber}`, '_blank', 'noopener,noreferrer');
+      const token = localStorage.getItem('kb_token');
+      window.open(`/api/documents/${citation.doc_id}/open?token=${token}#page=${pageNumber}`, '_blank', 'noopener,noreferrer');
     } else {
       // For non-PDFs (Word, PPT, etc), download a text file containing the exact source context
       const content = `=== SOURCE CITATION ===\n\nDocument: ${citation.doc_name}\nLocation: ${citation.page_or_section}\n\n=== SOURCE TEXT ===\n\n${citation.excerpt}`;
@@ -202,28 +245,30 @@ const ChatContainer = forwardRef(function ChatContainer({ documentCount }, ref) 
     <div className="chat-pane">
       <div className="messages-container">
         {messages.length === 0 ? (
-          <div className="welcome-state">
-            <div className="welcome-hero">
-              <div className="welcome-ring" />
-              <div className="welcome-logo" />
-            </div>
-
-            <h1 className="welcome-heading"><span>What can I help you find?</span></h1>
-            <p className="welcome-sub">
-    Upload documents in the Document section and start asking questions.
-        <br />
-  These are the supported formats:
-</p>
-
-            <div className="formats-grid">
-              {supportedFormats.map(f => (
-                <div key={f.ext} className="format-card">
-                  <f.icon size={22} color={f.color} />
-                  <span className="format-ext">{f.ext}</span>
-                </div>
-              ))}
-            </div>
+        <div className="welcome-state">
+          <div className="welcome-hero">
+            <div className="welcome-ring" />
+            <div className="welcome-logo" />
           </div>
+
+          <h1 className="welcome-heading">
+            Hi {user?.username ? user.username.charAt(0).toUpperCase() + user.username.slice(1) : ''}, <span>What can I help you find?</span>
+          </h1>
+          <p className="welcome-sub">
+            Upload documents in the Document section and start asking questions.
+            <br />
+            These are the supported formats:
+          </p>
+
+          <div className="formats-grid">
+            {supportedFormats.map(f => (
+              <div key={f.ext} className="format-card">
+                <f.icon size={22} color={f.color} />
+                <span className="format-ext">{f.ext}</span>
+              </div>
+            ))}
+          </div>
+        </div>
         ) : (
           messages.map((msg, i) => (
             <div key={i} className={`message-row ${msg.role}`}>

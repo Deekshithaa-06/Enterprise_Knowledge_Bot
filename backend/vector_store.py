@@ -2,7 +2,7 @@ import numpy as np
 from typing import List, Dict, Any, Optional
 from google import genai
 from backend.config import settings
-from backend.database import get_all_chunks_with_embeddings
+from backend.database import get_user_chunks_with_embeddings
 
 def get_client() -> Optional[genai.Client]:
     """Get initialized Gemini client if API key is present."""
@@ -174,14 +174,15 @@ def keyword_search_fallback(query: str, chunks: List[Dict[str, Any]], top_k: int
         
     return result
 
-def search_similar_chunks(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+def search_similar_chunks(query: str, user_id: int, top_k: int = 5) -> List[Dict[str, Any]]:
     """
     Search for the most relevant document chunks based on semantic similarity.
-    Falls back to keyword matching if Gemini API is not configured, fails, or
-    if chunks have no embeddings yet.
+    Isolated to the current user's documents.
     """
-    # Fetch ALL active chunks from the database (with or without embeddings)
-    chunks = get_all_chunks_with_embeddings()
+    from backend.database import get_user_chunks_with_embeddings
+    
+    # Fetch ALL active chunks for this user from the database
+    chunks = get_user_chunks_with_embeddings(user_id)
     if not chunks:
         return []
 

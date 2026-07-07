@@ -1,4 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('./auth.css');
+@import url('./admin.css');
+@import url('./admin-pro.css');
+@import url('./split-auth.css');
 
 /* ══════════════════════════════════════════════
    LIGHT THEME (Default)
@@ -256,6 +260,7 @@ a:hover { text-decoration: underline; }
 }
 
 .theme-toggle-btn:hover { border-color: var(--border-acc); color: var(--text-primary); }
+.theme-toggle-btn.logout-btn:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-bg); }
 
 .toggle-track {
   width: 38px; height: 20px;
@@ -322,7 +327,7 @@ a:hover { text-decoration: underline; }
   box-shadow: 0 4px 15px rgba(161, 0, 255, 0.4);
 }
 
-.welcome-hero { position: relative; margin-bottom: 10px; }
+.welcome-hero { position: relative; margin-bottom: 20px; }
 
 .welcome-logo {
   width: 90px; height: 90px;
@@ -375,7 +380,7 @@ a:hover { text-decoration: underline; }
 }
 
 .formats-grid {
-  display: flex; gap: 14px; margin-top: 12px;
+  display: flex; gap: 14px; margin-top: -4px;
   flex-wrap: wrap; justify-content: center;
 }
 

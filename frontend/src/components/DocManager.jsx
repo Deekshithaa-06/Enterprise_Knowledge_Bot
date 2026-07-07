@@ -25,10 +25,15 @@ export default function DocManager({ onDocsUpdated }) {
 
   const fetchDocuments = async () => {
     try {
-      const res = await fetch('/api/documents');
-      const data = await res.json();
-      setDocuments(data);
-      if (onDocsUpdated) onDocsUpdated(data);
+      const token = localStorage.getItem('kb_token');
+      const res = await fetch('/api/documents', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDocuments(data);
+        if (onDocsUpdated) onDocsUpdated(data);
+      }
     } catch (err) { console.error("Error fetching documents:", err); }
   };
 
@@ -39,7 +44,12 @@ export default function DocManager({ onDocsUpdated }) {
     formData.append('file', file);
 
     try {
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const token = localStorage.getItem('kb_token');
+      const res = await fetch('/api/upload', { 
+        method: 'POST', 
+        body: formData,
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       const data = await res.json();
       if (res.status === 409)      setNotification({ text: data.detail || 'Duplicate detected.', type: 'warning' });
       else if (res.status === 400) setNotification({ text: data.detail || 'Invalid file type.', type: 'error' });
@@ -56,7 +66,11 @@ export default function DocManager({ onDocsUpdated }) {
   const handleDelete = async (docId, filename) => {
     if (!confirm(`Delete "${filename}" and all associated index data?`)) return;
     try {
-      const res = await fetch(`/api/documents/${docId}`, { method: 'DELETE' });
+      const token = localStorage.getItem('kb_token');
+      const res = await fetch(`/api/documents/${docId}`, { 
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) { setNotification({ text: `"${filename}" deleted.`, type: 'info' }); fetchDocuments(); }
       else { const d = await res.json(); setNotification({ text: d.detail || 'Delete failed.', type: 'error' }); }
     } catch { setNotification({ text: 'Backend connection failed.', type: 'error' }); }
